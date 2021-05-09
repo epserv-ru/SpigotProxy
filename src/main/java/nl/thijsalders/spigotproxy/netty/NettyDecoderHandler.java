@@ -7,9 +7,9 @@ import java.util.List;
 
 public class NettyDecoderHandler extends MessageToMessageDecoder<Object> {
 
-	private NettyInjectHandler handler;
+	private final NettyInjectHandler handler;
 	
-	public NettyDecoderHandler(NettyInjectHandler handler) throws Exception {
+	public NettyDecoderHandler(NettyInjectHandler handler) {
 		this.handler = handler;
 	}
 

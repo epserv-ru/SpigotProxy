@@ -1,59 +1,194 @@
 package nl.thijsalders.spigotproxy;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+
+/**
+ * Utils for reflection and manipulation
+ */
 public class ReflectionUtils {
 
-	private static final Field FIELD_MODIFIERS;
-	private static final Field FIELD_ACCESSSOR;
-	private static final Field FIELD_ACCESSSOR_OVERRIDE;
-	private static final Field FIELD_ROOT;
+	/**
+	 * Cached information for Fields
+	 */
+	private static final Table<Class<?>, String, Field> CACHED_FIELDS_BY_NAME = HashBasedTable.create();
+	private static final Table<Class<?>, Class<?>, Field> CACHED_FIELDS_BY_CLASS = HashBasedTable.create();
+	private static Field modifiersField;
 
-	static {
-		Field fieldModifiers = null;
-		Field fieldAccessor = null;
-		Field fieldAccessorOverride = null;
-		Field fieldRoot = null;
-		try {
-			fieldModifiers = Field.class.getDeclaredField("modifiers");
-			fieldModifiers.setAccessible(true);
-			fieldAccessor = Field.class.getDeclaredField("fieldAccessor");
-			fieldAccessor.setAccessible(true);
-			fieldAccessorOverride = Field.class.getDeclaredField("overrideFieldAccessor");
-			fieldAccessorOverride.setAccessible(true);
-			fieldRoot = Field.class.getDeclaredField("root");
-			fieldRoot.setAccessible(true);
-		} catch (Exception exception) {
-			exception.printStackTrace();
-		}
-		FIELD_MODIFIERS = fieldModifiers;
-		FIELD_ACCESSSOR = fieldAccessor;
-		FIELD_ACCESSSOR_OVERRIDE = fieldAccessorOverride;
-		FIELD_ROOT = fieldRoot;
+
+	/**
+	 * Sets a final field, with a field name, inside an object
+	 * @param object The object
+	 * @param fieldName The field name
+	 * @param value The new value
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static void setFinalField(Object object, String fieldName, Object value) throws ReflectionException {
+		setFinalField(object, getPrivateField(object.getClass(), fieldName), value);
 	}
 
-	public static void setFinalField(Class<?> objectClass, Object object, String fieldName, Object value) throws Exception {
-		Field field = objectClass.getDeclaredField(fieldName);
+	/**
+	 * Sets a final field, with a field object, inside an object
+	 * @param object The object
+	 * @param field The field
+	 * @param value The new value
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static void setFinalField(Object object, Field field, Object value)  throws ReflectionException {
 		field.setAccessible(true);
 
 		if (Modifier.isFinal(field.getModifiers())) {
-			FIELD_MODIFIERS.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-			Field currentField = field;
-			do {
-				FIELD_ACCESSSOR.set(currentField, null);
-				FIELD_ACCESSSOR_OVERRIDE.set(currentField, null);
-			} while((currentField = (Field) FIELD_ROOT.get(currentField)) != null);
+			if (modifiersField == null) {
+				try {
+					modifiersField = getDeclaredField(Field.class, "modifiers");
+				} catch (ReflectionException e) { // workaround for when searching for the modifiers field on Java 12 or higher
+					try {
+						Method getDeclaredFields0 = Class.class.getDeclaredMethod("getDeclaredFields0", boolean.class);
+						getDeclaredFields0.setAccessible(true);
+
+						Field[] fields = (Field[]) getDeclaredFields0.invoke(Field.class, false);
+						modifiersField = Arrays.stream(fields).filter(modifier -> modifier.getName().equals("modifiers")).findFirst().orElseThrow(() -> new ReflectionException("Could not find the modifiers field"));
+					} catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e2) {
+						throw new ReflectionException(e2);
+					}
+				}
+
+				modifiersField.setAccessible(true);
+			}
+
+			try {
+				modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+			} catch (IllegalAccessException e) {
+				throw new ReflectionException(e);
+			}
 		}
-		
-		field.set(object, value);
+
+		setField(object, field, value);
+	}
+
+	/**
+	 * Sets a field, with a field name, inside an object
+	 * @param object The object
+	 * @param fieldName The field name
+	 * @param value The new value
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static void setField(Object object, String fieldName, Object value)  throws ReflectionException {
+		setField(object, getPrivateField(object.getClass(), fieldName), value);
+	}
+
+	/**
+	 * Sets a field, with a field object, inside an object
+	 * @param object The object
+	 * @param field The field
+	 * @param value The new value
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static void setField(Object object, Field field, Object value)  throws ReflectionException {
+		try {
+			field.set(object, value);
+		} catch (IllegalAccessException e) {
+			throw new ReflectionException(e);
+		}
+	}
+
+	/**
+	 * Gets the object inside a private field, with a field name, in an object
+	 * @param object The object
+	 * @param fieldName The field name
+	 * @return The grabbed object
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static Object getObjectInPrivateField(Object object, String fieldName)  throws ReflectionException {
+		Field field = getPrivateField(object.getClass(), fieldName);
+		try {
+			return field.get(object);
+		} catch (IllegalAccessException e) {
+			throw new ReflectionException(e);
+		}
+	}
+
+	/**
+	 * Gets a private field, with a field name, inside an object
+	 * @param clazz The clazz
+	 * @param fieldName The field name
+	 * @return The grabbed field
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static Field getPrivateField(Class<?> clazz, String fieldName) throws ReflectionException {
+		Field field = getDeclaredField(clazz, fieldName);
+		field.setAccessible(true);
+		return field;
+	}
+
+	/**
+	 * Searches for a field, with the type of the provided class, inside a class
+	 * @param clazz The class to search through
+	 * @param searchFor The class type to search for
+	 * @return The found field
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static Field searchFieldByClass(Class<?> clazz, Class<?> searchFor) throws ReflectionException {
+		Field cachedField = CACHED_FIELDS_BY_CLASS.get(clazz, searchFor);
+		if (cachedField != null) return cachedField;
+
+		Class<?> currentClass = clazz;
+		do {
+			for (Field field : currentClass.getDeclaredFields()) {
+				if (!searchFor.isAssignableFrom(field.getType())) continue;
+
+				CACHED_FIELDS_BY_CLASS.put(clazz, searchFor, field);
+				return field;
+			}
+
+			currentClass = currentClass.getSuperclass();
+		} while (currentClass != null);
+
+		throw new ReflectionException("no " + searchFor.getName() + " field for clazz = " + clazz.getName() + " found");
+	}
+
+	/**
+	 * Gets a declared field, with a field name, inside a class
+	 * @param clazz The clazz
+	 * @param fieldName The field name
+	 * @return The declared field
+	 * @throws ReflectionException Thrown when the operation was not successful
+	 */
+	public static Field getDeclaredField(Class<?> clazz, String fieldName) throws ReflectionException {
+		Field cachedField = CACHED_FIELDS_BY_NAME.get(clazz, fieldName);
+		if (cachedField != null) return cachedField;
+
+		Field field;
+		try {
+			field = clazz.getDeclaredField(fieldName);
+		} catch (NoSuchFieldException e) {
+			Class<?> superclass = clazz.getSuperclass();
+			if (superclass != null) {
+				return getDeclaredField(superclass, fieldName);
+			} else {
+				throw new ReflectionException(e);
+			}
+		}
+
+		CACHED_FIELDS_BY_NAME.put(clazz, fieldName, field);
+		return field;
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <T> T getPrivateField(Class<?> objectClass, Object object, Class<T> fieldClass, String fieldName) throws Exception {
-		Field field = objectClass.getDeclaredField(fieldName);
+	public static <T> T getDeclaredField(Object object, String fieldName) {
+		Field field = getDeclaredField(object.getClass(), fieldName);
 		field.setAccessible(true);
-		return (T) field.get(object);
+		try {
+			return (T) field.get(object);
+		} catch (IllegalAccessException e) {
+			throw new ReflectionException(e);
+		}
 	}
 
 }

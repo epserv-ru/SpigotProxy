@@ -141,18 +141,12 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
      * @param maxTlvSize maximum number of bytes allowed for additional data (Type-Length-Value vectors) in a v2 header
      */
     public HAProxyMessageDecoder(int maxTlvSize) {
-        if (maxTlvSize < 1) {
+        if (maxTlvSize < 1)
             v2MaxHeaderSize = V2_MIN_LENGTH;
-        } else if (maxTlvSize > V2_MAX_TLV) {
+        else if (maxTlvSize > V2_MAX_TLV)
             v2MaxHeaderSize = V2_MAX_LENGTH;
-        } else {
-            int calcMax = maxTlvSize + V2_MIN_LENGTH;
-            if (calcMax > V2_MAX_LENGTH) {
-                v2MaxHeaderSize = V2_MAX_LENGTH;
-            } else {
-                v2MaxHeaderSize = calcMax;
-            }
-        }
+        else
+            v2MaxHeaderSize = maxTlvSize + V2_MIN_LENGTH;
     }
 
     /**
@@ -226,7 +220,7 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
     }
 
     @Override
-    protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+    protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws HAProxyProtocolException {
         // determine the specification version
         if (version == -1) {
             if ((version = findVersion(in)) == -1) {
@@ -260,12 +254,12 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
      * Create a frame out of the {@link ByteBuf} and return it.
      * Based on code from {@link LineBasedFrameDecoder#decode(ChannelHandlerContext, ByteBuf)}.
      *
-     * @param ctx     the {@link ChannelHandlerContext} which this {@link HAProxyMessageDecoder} belongs to
-     * @param buffer  the {@link ByteBuf} from which to read data
-     * @return frame  the {@link ByteBuf} which represent the frame or {@code null} if no frame could
-     *                be created
+     * @param ctx    the {@link ChannelHandlerContext} which this {@link HAProxyMessageDecoder} belongs to
+     * @param buffer the {@link ByteBuf} from which to read data
+     * @return frame the {@link ByteBuf} which represent the frame or {@code null} if no frame could
+     *               be created
      */
-    private ByteBuf decodeStruct(ChannelHandlerContext ctx, ByteBuf buffer) throws Exception {
+    private ByteBuf decodeStruct(ChannelHandlerContext ctx, ByteBuf buffer) {
         final int eoh = findEndOfHeader(buffer);
         if (!discarding) {
             if (eoh >= 0) {
@@ -308,7 +302,7 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
      * @return frame  the {@link ByteBuf} which represent the frame or {@code null} if no frame could
      *                be created
      */
-    private ByteBuf decodeLine(ChannelHandlerContext ctx, ByteBuf buffer) throws Exception {
+    private ByteBuf decodeLine(ChannelHandlerContext ctx, ByteBuf buffer) {
         final int eol = findEndOfLine(buffer);
         if (!discarding) {
             if (eol >= 0) {
@@ -333,8 +327,8 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
             }
         } else {
             if (eol >= 0) {
-                final int delimLength = buffer.getByte(eol) == '\r' ? 2 : 1;
-                buffer.readerIndex(eol + delimLength);
+                final int delimiterLength = buffer.getByte(eol) == '\r' ? 2 : 1;
+                buffer.readerIndex(eol + delimiterLength);
                 discardedBytes = 0;
                 discarding = false;
             } else {
@@ -351,23 +345,23 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
 
     private void failOverLimit(final ChannelHandlerContext ctx, String length) {
         int maxLength = version == 1 ? V1_MAX_LENGTH : v2MaxHeaderSize;
-        fail(ctx, "header length (" + length + ") exceeds the allowed maximum (" + maxLength + ')', null);
+        fail(ctx, "Header length (" + length + ") exceeds the allowed maximum (" + maxLength + ')', null);
     }
 
-    private void fail(final ChannelHandlerContext ctx, String errMsg, Throwable t) {
+    private void fail(final ChannelHandlerContext ctx, String errMsg, Throwable t) throws HAProxyProtocolException {
         finished = true;
         ctx.close(); // drop connection immediately per spec
-        HAProxyProtocolException ppex;
+        HAProxyProtocolException exception;
         if (errMsg != null && t != null) {
-            ppex = new HAProxyProtocolException(errMsg, t);
+            exception = new HAProxyProtocolException(errMsg, t);
         } else if (errMsg != null) {
-            ppex = new HAProxyProtocolException(errMsg);
+            exception = new HAProxyProtocolException(errMsg);
         } else if (t != null) {
-            ppex = new HAProxyProtocolException(t);
+            exception = new HAProxyProtocolException(t);
         } else {
-            ppex = new HAProxyProtocolException();
+            exception = new HAProxyProtocolException();
         }
-        throw ppex;
+        throw exception;
     }
 
     /**

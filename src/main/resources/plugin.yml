@@ -1,6 +1,8 @@
 name: SpigotProxy
 main: nl.thijsalders.spigotproxy.SpigotProxy
-version: 1
+version: ${version}
 author: thijs_a
+authors: ["l_MrBoom_l"]
+
 api-version: 1.13
 loadbefore: ["ProtocolLib"]

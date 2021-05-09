@@ -1,8 +1,7 @@
 package nl.thijsalders.spigotproxy.haproxy;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufProcessor;
-//import io.netty.util.ByteProcessor;
+import io.netty.util.ByteProcessor;
 import io.netty.util.CharsetUtil;
 import io.netty.util.NetUtil;
 import nl.thijsalders.spigotproxy.haproxy.HAProxyProxiedProtocol.AddressFamily;
@@ -62,10 +61,10 @@ public final class HAProxyMessage {
         if (proxiedProtocol == null) {
             throw new NullPointerException("proxiedProtocol");
         }
-        AddressFamily addrFamily = proxiedProtocol.addressFamily();
+        AddressFamily addressFamily = proxiedProtocol.addressFamily();
 
-        checkAddress(sourceAddress, addrFamily);
-        checkAddress(destinationAddress, addrFamily);
+        checkAddress(sourceAddress, addressFamily);
+        checkAddress(destinationAddress, addressFamily);
         checkPort(sourcePort);
         checkPort(destinationPort);
 
@@ -122,14 +121,14 @@ public final class HAProxyMessage {
         }
 
         // Per spec, the 14th byte is the protocol and address family byte
-        HAProxyProxiedProtocol protAndFam;
+        HAProxyProxiedProtocol protocolAndFamily;
         try {
-            protAndFam = HAProxyProxiedProtocol.valueOf(header.readByte());
+            protocolAndFamily = HAProxyProxiedProtocol.valueOf(header.readByte());
         } catch (IllegalArgumentException e) {
             throw new HAProxyProtocolException(e);
         }
 
-        if (protAndFam == HAProxyProxiedProtocol.UNKNOWN) {
+        if (protocolAndFamily == HAProxyProxiedProtocol.UNKNOWN) {
             return V2_UNKNOWN_MSG;
         }
 
@@ -141,7 +140,7 @@ public final class HAProxyMessage {
         int srcPort = 0;
         int dstPort = 0;
 
-        AddressFamily addressFamily = protAndFam.addressFamily();
+        AddressFamily addressFamily = protocolAndFamily.addressFamily();
 
         if (addressFamily == AddressFamily.AF_UNIX) {
             // unix sockets require 216 bytes for address information
@@ -151,7 +150,7 @@ public final class HAProxyMessage {
                             Math.min(addressInfoLen, header.readableBytes()) + " bytes (expected: 216+ bytes)");
             }
             int startIdx = header.readerIndex();
-            int addressEnd = header.forEachByte(startIdx, 108, ByteBufProcessor.FIND_NUL);
+            int addressEnd = header.forEachByte(startIdx, 108, ByteProcessor.FIND_NUL);
             if (addressEnd == -1) {
                 addressLen = 108;
             } else {
@@ -161,7 +160,7 @@ public final class HAProxyMessage {
 
             startIdx += 108;
 
-            addressEnd = header.forEachByte(startIdx, 108, ByteBufProcessor.FIND_NUL);
+            addressEnd = header.forEachByte(startIdx, 108, ByteProcessor.FIND_NUL);
             if (addressEnd == -1) {
                 addressLen = 108;
             } else {
@@ -187,17 +186,17 @@ public final class HAProxyMessage {
                 addressLen = 16;
             } else {
                 throw new HAProxyProtocolException(
-                    "unable to parse address information (unkown address family: " + addressFamily + ')');
+                    "unable to parse address information (unknown address family: " + addressFamily + ')');
             }
 
             // Per spec, the src address begins at the 17th byte
-            srcAddress = ipBytestoString(header, addressLen);
-            dstAddress = ipBytestoString(header, addressLen);
+            srcAddress = ipBytesToString(header, addressLen);
+            dstAddress = ipBytesToString(header, addressLen);
             srcPort = header.readUnsignedShort();
             dstPort = header.readUnsignedShort();
         }
 
-        return new HAProxyMessage(ver, cmd, protAndFam, srcAddress, dstAddress, srcPort, dstPort);
+        return new HAProxyMessage(ver, cmd, protocolAndFamily, srcAddress, dstAddress, srcPort, dstPort);
     }
 
     /**
@@ -224,20 +223,20 @@ public final class HAProxyMessage {
             throw new HAProxyProtocolException("unknown identifier: " + parts[0]);
         }
 
-        HAProxyProxiedProtocol protAndFam;
+        HAProxyProxiedProtocol protocolAndFamily;
         try {
-            protAndFam = HAProxyProxiedProtocol.valueOf(parts[1]);
+            protocolAndFamily = HAProxyProxiedProtocol.valueOf(parts[1]);
         } catch (IllegalArgumentException e) {
             throw new HAProxyProtocolException(e);
         }
 
-        if (protAndFam != HAProxyProxiedProtocol.TCP4 &&
-                protAndFam != HAProxyProxiedProtocol.TCP6 &&
-                protAndFam != HAProxyProxiedProtocol.UNKNOWN) {
+        if (protocolAndFamily != HAProxyProxiedProtocol.TCP4 &&
+                protocolAndFamily != HAProxyProxiedProtocol.TCP6 &&
+                protocolAndFamily != HAProxyProxiedProtocol.UNKNOWN) {
             throw new HAProxyProtocolException("unsupported v1 proxied protocol: " + parts[1]);
         }
 
-        if (protAndFam == HAProxyProxiedProtocol.UNKNOWN) {
+        if (protocolAndFamily == HAProxyProxiedProtocol.UNKNOWN) {
             return V1_UNKNOWN_MSG;
         }
 
@@ -247,7 +246,7 @@ public final class HAProxyMessage {
 
         return new HAProxyMessage(
                 HAProxyProtocolVersion.V1, HAProxyCommand.PROXY,
-                protAndFam, parts[2], parts[3], parts[4], parts[5]);
+                protocolAndFamily, parts[2], parts[3], parts[4], parts[5]);
     }
 
     /**
@@ -257,7 +256,7 @@ public final class HAProxyMessage {
      * @param addressLen number of bytes to read (4 bytes for IPv4, 16 bytes for IPv6)
      * @return           string representation of the ip address
      */
-    private static String ipBytestoString(ByteBuf header, int addressLen) {
+    private static String ipBytesToString(ByteBuf header, int addressLen) {
         StringBuilder sb = new StringBuilder();
         if (addressLen == 4) {
             sb.append(header.readByte() & 0xff);
@@ -312,21 +311,20 @@ public final class HAProxyMessage {
     /**
      * Validate an address (IPv4, IPv6, Unix Socket)
      *
-     * @param address                    human-readable address
-     * @param addrFamily                 the {@link AddressFamily} to check the address against
-     * @throws HAProxyProtocolException  if the address is invalid
+     * @param address                   human-readable address
+     * @param addressFamily             the {@link AddressFamily} to check the address against
+     * @throws HAProxyProtocolException if the address is invalid
      */
     @SuppressWarnings("incomplete-switch")
-	private static void checkAddress(String address, AddressFamily addrFamily) {
-        if (addrFamily == null) {
-            throw new NullPointerException("addrFamily");
+	private static void checkAddress(String address, AddressFamily addressFamily) {
+        if (addressFamily == null) {
+            throw new NullPointerException("addressFamily");
         }
 
-        switch (addrFamily) {
+        switch (addressFamily) {
             case AF_UNSPEC:
-                if (address != null) {
-                    throw new HAProxyProtocolException("unable to validate an AF_UNSPEC address: " + address);
-                }
+                if (address != null)
+                    throw new HAProxyProtocolException("Unable to validate an AF_UNSPEC address: " + address);
                 return;
             case AF_UNIX:
                 return;
@@ -336,15 +334,15 @@ public final class HAProxyMessage {
             throw new NullPointerException("address");
         }
 
-        switch (addrFamily) {
+        switch (addressFamily) {
             case AF_IPv4:
                 if (!NetUtil.isValidIpV4Address(address)) {
-                    throw new HAProxyProtocolException("invalid IPv4 address: " + address);
+                    throw new HAProxyProtocolException("Invalid IPv4 address: " + address);
                 }
                 break;
             case AF_IPv6:
                 if (!NetUtil.isValidIpV6Address(address)) {
-                    throw new HAProxyProtocolException("invalid IPv6 address: " + address);
+                    throw new HAProxyProtocolException("Invalid IPv6 address: " + address);
                 }
                 break;
             default:
@@ -355,17 +353,18 @@ public final class HAProxyMessage {
     /**
      * Validate a UDP/TCP port
      *
-     * @param port                       the UDP/TCP port
-     * @throws HAProxyProtocolException  if the port is out of range (0-65535 inclusive)
+     * @param port                      the UDP/TCP port
+     * @throws HAProxyProtocolException if the port is out of range (0-65535 inclusive)
      */
     private static void checkPort(int port) {
         if (port < 0 || port > 65535) {
-            throw new HAProxyProtocolException("invalid port: " + port + " (expected: 1 ~ 65535)");
+            throw new HAProxyProtocolException("Invalid port: " + port + " (expected: 1 ~ 65535)");
         }
     }
 
     /**
      * Returns the {@link HAProxyProtocolVersion} of this {@link HAProxyMessage}.
+     * @return {@link HAProxyProtocolVersion} of this {@link HAProxyMessage}.
      */
     public HAProxyProtocolVersion protocolVersion() {
         return protocolVersion;
@@ -373,6 +372,7 @@ public final class HAProxyMessage {
 
     /**
      * Returns the {@link HAProxyCommand} of this {@link HAProxyMessage}.
+     * @return {@link HAProxyCommand} of this {@link HAProxyMessage}.
      */
     public HAProxyCommand command() {
         return command;
@@ -380,6 +380,7 @@ public final class HAProxyMessage {
 
     /**
      * Returns the {@link HAProxyProxiedProtocol} of this {@link HAProxyMessage}.
+     * @return {@link HAProxyProxiedProtocol} of this {@link HAProxyMessage}.
      */
     public HAProxyProxiedProtocol proxiedProtocol() {
         return proxiedProtocol;
@@ -387,6 +388,7 @@ public final class HAProxyMessage {
 
     /**
      * Returns the human-readable source address of this {@link HAProxyMessage}.
+     * @return the human-readable source address of this {@link HAProxyMessage}.
      */
     public String sourceAddress() {
         return sourceAddress;
@@ -394,6 +396,7 @@ public final class HAProxyMessage {
 
     /**
      * Returns the human-readable destination address of this {@link HAProxyMessage}.
+     * @return the human-readable destination address of this {@link HAProxyMessage}.
      */
     public String destinationAddress() {
         return destinationAddress;
@@ -401,6 +404,7 @@ public final class HAProxyMessage {
 
     /**
      * Returns the UDP/TCP source port of this {@link HAProxyMessage}.
+     * @return UDP/TCP source port of this {@link HAProxyMessage}.
      */
     public int sourcePort() {
         return sourcePort;
@@ -408,6 +412,7 @@ public final class HAProxyMessage {
 
     /**
      * Returns the UDP/TCP destination port of this {@link HAProxyMessage}.
+     * @return UDP/TCP destination port of this {@link HAProxyMessage}.
      */
     public int destinationPort() {
         return destinationPort;

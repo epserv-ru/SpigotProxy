@@ -8,7 +8,7 @@ package nl.thijsalders.spigotproxy.haproxy;
 public final class ProtocolDetectionResult<T> {
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    private static final ProtocolDetectionResult NEEDS_MORE_DATE =
+    private static final ProtocolDetectionResult NEEDS_MORE_DATA =
             new ProtocolDetectionResult(ProtocolDetectionState.NEEDS_MORE_DATA, null);
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static final ProtocolDetectionResult INVALID =
@@ -22,7 +22,7 @@ public final class ProtocolDetectionResult<T> {
      */
     @SuppressWarnings("unchecked")
     public static <T> ProtocolDetectionResult<T> needsMoreData() {
-        return NEEDS_MORE_DATE;
+        return NEEDS_MORE_DATA;
     }
 
     /**
@@ -37,7 +37,7 @@ public final class ProtocolDetectionResult<T> {
      * Returns a {@link ProtocolDetectionResult} which holds the detected protocol.
      */
     public static <T> ProtocolDetectionResult<T> detected(T protocol) {
-        return new ProtocolDetectionResult<T>(ProtocolDetectionState.DETECTED, checkNotNull(protocol, "protocol"));
+        return new ProtocolDetectionResult<>(ProtocolDetectionState.DETECTED, checkNotNull(protocol, "protocol"));
     }
 
     private ProtocolDetectionResult(ProtocolDetectionState state, T result) {
