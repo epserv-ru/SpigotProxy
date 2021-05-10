@@ -23,7 +23,7 @@ public class SpigotProxy extends JavaPlugin {
 	private static final String CHANNEL_FIELD_NAME;
 	private static final String MINECRAFT_PACKAGE;
 
-	public final HashMap<UUID, SocketAddress> playerProxies = new HashMap<>();
+	public final HashMap<Object, SocketAddress> playerProxies = new HashMap<>();
 
 	static {
 		String version = Bukkit.getServer().getClass().getPackage().getName().replace(".",  ",")
@@ -170,7 +170,15 @@ public class SpigotProxy extends JavaPlugin {
 	 */
 	@Nullable
 	public SocketAddress getProxyAddress(@NotNull Player player) {
-		return this.playerProxies.get(player.getUniqueId());
+		try {
+			Object entityPlayer = player.getClass().getMethod("getHandle").invoke(player);
+			Object networkManager = ReflectionUtils.getDeclaredField(ReflectionUtils.getDeclaredField(entityPlayer,
+					"playerConnection"), "networkManager");
+			return this.playerProxies.get(networkManager);
+		} catch (Throwable t) {
+			t.printStackTrace();
+			return null;
+		}
 	}
 
 	/**

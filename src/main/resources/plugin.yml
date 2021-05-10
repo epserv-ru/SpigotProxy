@@ -1,6 +1,6 @@
 name: SpigotProxy
 main: nl.thijsalders.spigotproxy.SpigotProxy
-version: ${version}
+version: ${project.version}
 author: thijs_a
 authors: ["l_MrBoom_l"]
 

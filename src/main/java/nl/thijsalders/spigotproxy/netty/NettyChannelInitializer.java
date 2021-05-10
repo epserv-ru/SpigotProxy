@@ -41,28 +41,28 @@ public class NettyChannelInitializer extends ChannelInitializer<SocketChannel> {
 		channel.pipeline().addAfter("haproxy-decoder", "haproxy-handler", new ChannelInboundHandlerAdapter() {
         	@Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                if (msg instanceof HAProxyMessage) {
-                    HAProxyMessage message = (HAProxyMessage) msg;
+        		try {
+					if (msg instanceof HAProxyMessage) {
+						HAProxyMessage message = (HAProxyMessage) msg;
 
-                    String realAddress = message.sourceAddress();
-                    int realPort = message.sourcePort();
+						String realAddress = message.sourceAddress();
+						int realPort = message.sourcePort();
 
-                    SocketAddress socketAddress = new InetSocketAddress(realAddress, realPort);
+						SocketAddress socketAddress = new InetSocketAddress(realAddress, realPort);
 
-                    ChannelHandler handler = channel.pipeline().get("packet_handler");
+						ChannelHandler handler = channel.pipeline().get("packet_handler");
 
-                    SocketAddress oldAddress = (SocketAddress) socketAddressField.get(handler);
-                    if (!socketAddress.equals(oldAddress)) {
-                    	Object entityPlayer = handler.getClass().getMethod("getPlayer").invoke(handler);
-                    	Player player = (Player) entityPlayer.getClass().getMethod("getBukkitEntity")
-								.invoke(entityPlayer);
-						SpigotProxy.getInstance().playerProxies.put(player.getUniqueId(), oldAddress);
+						SocketAddress oldAddress = (SocketAddress) socketAddressField.get(handler);
+						if (!socketAddress.equals(oldAddress))
+							SpigotProxy.getInstance().playerProxies.put(handler, oldAddress);
+
+						socketAddressField.set(handler, socketAddress);
+					} else {
+						super.channelRead(ctx, msg);
 					}
-
-					socketAddressField.set(handler, socketAddress);
-                } else {
-                    super.channelRead(ctx, msg);
-                }
+				} catch (Throwable t) {
+        			t.printStackTrace();
+				}
             }
 		});
 	}

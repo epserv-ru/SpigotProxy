@@ -20,8 +20,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Decodes an HAProxy proxy protocol header
@@ -161,7 +163,12 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
         }
 
         int idx = buffer.readerIndex();
-        return match(BINARY_PREFIX, buffer, idx) ? buffer.getByte(idx + BINARY_PREFIX_LENGTH) : 1;
+        if (match(BINARY_PREFIX, buffer, idx)) {
+            return 2;
+        } else if (match(TEXT_PREFIX, buffer, idx)) {
+            return 1;
+        } else
+            return -1;
     }
 
     /**
@@ -211,6 +218,8 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
         return true;
     }
 
+    public static final AtomicInteger i = new AtomicInteger(0);
+
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         super.channelRead(ctx, msg);
@@ -223,7 +232,9 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
     protected final void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws HAProxyProtocolException {
         // determine the specification version
         if (version == -1) {
-            if ((version = findVersion(in)) == -1) {
+            if ((version = findVersion(in)) == -1) { // not proxy protocol or user is connecting directly
+                ctx.pipeline().remove(this);
+                ctx.fireChannelRead(ReferenceCountUtil.retain(in.resetReaderIndex()));
                 return;
             }
         }
@@ -247,6 +258,9 @@ public class HAProxyMessageDecoder extends ByteToMessageDecoder {
             } catch (HAProxyProtocolException e) {
                 fail(ctx, null, e);
             }
+        } else { // user is connecting directly
+            ctx.pipeline().remove(this);
+            ctx.fireChannelRead(ReferenceCountUtil.retain(in.resetReaderIndex()));
         }
     }
 
