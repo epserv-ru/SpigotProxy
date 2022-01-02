@@ -16,7 +16,6 @@ import java.lang.reflect.Method;
 import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.List;
-import java.util.UUID;
 
 public class SpigotProxy extends JavaPlugin {
 	
@@ -44,13 +43,13 @@ public class SpigotProxy extends JavaPlugin {
 	}
 	
 	public void onLoad() {
-		getLogger().info("Loading " + this.getName() + "...");
+		this.getLogger().info("Loading " + this.getName() + "...");
 		try {
-			getLogger().info("Injecting NettyHandler...");
+			this.getLogger().info("Injecting NettyHandler...");
 			this.inject();
-			getLogger().info("Injection successful!");
+			this.getLogger().info("Injection successful!");
 		} catch (Exception e) {
-			getLogger().info("Injection netty handler failed!");
+			this.getLogger().info("Injection netty handler failed!");
 			if (e instanceof RuntimeException)
 				throw (RuntimeException) e;
 			else
@@ -82,6 +81,8 @@ public class SpigotProxy extends JavaPlugin {
 			case "v1_8_R3":
 				name = "g";
 				break;
+			case "v1_18_R1":
+			case "v1_17_R1":
 			case "v1_14_R1":
 			case "v1_13_R1":
 			case "v1_13_R2":
@@ -185,7 +186,7 @@ public class SpigotProxy extends JavaPlugin {
 	 * Returns SpigotProxy instance.
 	 * @return {@link SpigotProxy} instance.
 	 */
-	public static SpigotProxy getInstance() {
+	public static @NotNull SpigotProxy getInstance() {
 		return SpigotProxy.getPlugin(SpigotProxy.class);
 	}
 

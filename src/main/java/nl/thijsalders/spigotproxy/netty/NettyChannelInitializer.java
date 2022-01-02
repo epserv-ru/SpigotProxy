@@ -2,16 +2,14 @@ package nl.thijsalders.spigotproxy.netty;
 
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
+import nl.thijsalders.spigotproxy.SpigotProxy;
+import nl.thijsalders.spigotproxy.haproxy.HAProxyMessage;
+import nl.thijsalders.spigotproxy.haproxy.HAProxyMessageDecoder;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-
-import nl.thijsalders.spigotproxy.SpigotProxy;
-import nl.thijsalders.spigotproxy.haproxy.HAProxyMessage;
-import nl.thijsalders.spigotproxy.haproxy.HAProxyMessageDecoder;
-import org.bukkit.entity.Player;
 
 public class NettyChannelInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -25,7 +23,12 @@ public class NettyChannelInitializer extends ChannelInitializer<SocketChannel> {
 		this.oldChildHandlerMethod = oldChildHandler.getClass().getDeclaredMethod("initChannel", Channel.class);
 		this.oldChildHandlerMethod.setAccessible(true);
 
-		Class<?> networkManager = Class.forName(minecraftPackage + ".NetworkManager");
+		Class<?> networkManager;
+		try {
+			 networkManager = Class.forName(minecraftPackage + ".NetworkManager");
+		} catch (ClassNotFoundException ex) {
+			networkManager = Class.forName("net.minecraft.network.NetworkManager");
+		}
 		try {
 			this.socketAddressField = networkManager.getField("socketAddress");
 		} catch (NoSuchFieldException e) {
@@ -40,7 +43,7 @@ public class NettyChannelInitializer extends ChannelInitializer<SocketChannel> {
 		channel.pipeline().addAfter("timeout", "haproxy-decoder", new HAProxyMessageDecoder());
 		channel.pipeline().addAfter("haproxy-decoder", "haproxy-handler", new ChannelInboundHandlerAdapter() {
         	@Override
-            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            public void channelRead(ChannelHandlerContext ctx, Object msg) {
         		try {
 					if (msg instanceof HAProxyMessage) {
 						HAProxyMessage message = (HAProxyMessage) msg;
