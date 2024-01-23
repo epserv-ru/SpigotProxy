@@ -6,7 +6,7 @@ SpigotProxy is a Spigot plugin that enables compatibility with HAProxy's PROXY v
 
 This plugin is no longer needed because Paper 1.18.2 now has PROXY v2 protocol compatibility built-in since build 344 [[31ccc57]](https://github.com/PaperMC/Paper/commit/31ccc579b5cab625b8e0c4ee4d521ffb6bf984b2). This project was a fork of [riku6460/SpigotProxy](https://github.com/riku6460/SpigotProxy), because riku6460's project seemed abandoned and was no longer receiving updates, but now it does and is being actively updated, so use [riku6460's project](https://github.com/riku6460/SpigotProxy) if you're still looking for updates of this project.
 
-This fork is now archived. Feel free to contact me on Discord by `l_MrBoom_l#9553` tag if you have any questions.
+This fork is now archived. Feel free to contact me on Discord by `@metabrix` if you have any questions.
 
 ## What's HAProxy?
 
